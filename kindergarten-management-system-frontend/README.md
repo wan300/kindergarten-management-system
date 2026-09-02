@@ -37,7 +37,7 @@ Optional frontend environment variables:
 
 - `VITE_API_BASE_URL`: absolute Rails API origin; leave empty for relative API paths.
 - `VITE_API_PROXY_TARGET`: Rails origin used by the Vite development proxy (defaults to `http://127.0.0.1:3000`).
-- `VITE_CHILD_DEV2_URL`: URL embedded by the administrator's Child Growth OS view (defaults to `http://localhost:8080`).
+- `VITE_CHILD_DEV2_URL`: URL embedded by the administrator's Child Growth OS view (defaults to the same-origin `/child-growth/` proxy; set `http://localhost:8080` explicitly for local Child Growth OS development).
 ## Backend
 installing ruby gems
 ```html

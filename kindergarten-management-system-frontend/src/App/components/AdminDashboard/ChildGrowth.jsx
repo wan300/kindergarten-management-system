@@ -1,6 +1,6 @@
 import React from "react";
 
-const DEFAULT_CHILD_DEV2_URL = "http://localhost:8080";
+const DEFAULT_CHILD_DEV2_URL = "/child-growth/";
 
 function childDev2Url() {
   const configuredUrl = process.env.REACT_APP_CHILD_DEV2_URL?.trim();

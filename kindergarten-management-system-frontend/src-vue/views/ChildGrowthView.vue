@@ -1,7 +1,8 @@
 <script setup>
 import { ExternalLink, Maximize2 } from "lucide-vue-next";
 
-const appUrl = (import.meta.env.VITE_CHILD_DEV2_URL || "http://localhost:8080").trim();
+// The deployed child application is exposed through the same public origin by Nginx.
+const appUrl = (import.meta.env.VITE_CHILD_DEV2_URL || "/child-growth/").trim();
 </script>
 
 <template>
