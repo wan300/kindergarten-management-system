@@ -62,3 +62,6 @@ child_dev2/frontend/.vite/
 child_dev2/*.db
 child_dev2/*.sqlite
 child_dev2/*.sqlite3
+
+# Local visual design sessions
+.superpowers/

@@ -25,11 +25,11 @@ function isNavActive(to) {
       <button v-if="props.open" class="icon-button sidebar-close" type="button" title="关闭导航" aria-label="关闭导航" @click="emit('close')"><X :size="17" /></button>
       <RouterLink class="brand-lockup" :to="props.meta.nav[0][1]" @click="emit('close')">
         <img class="brand-mark" src="/assets/brand/para-kindergarten-logo.png" alt="ParaKindergarten" />
-        <span><strong class="brand-name">ParaKindergarten</strong><small class="brand-subtitle">{{ props.meta.label }} / SYSTEM</small></span>
+        <span><strong class="brand-name">ParaKindergarten</strong><small class="brand-subtitle">家园共育 · {{ props.meta.label }}</small></span>
       </RouterLink>
     </div>
     <nav class="shell-nav" aria-label="主导航">
-      <span class="shell-nav-label">Workspace</span>
+      <span class="shell-nav-label">日常工作</span>
       <RouterLink v-for="[label, to, Icon] in props.meta.nav"
         :key="to"
         :to="to"

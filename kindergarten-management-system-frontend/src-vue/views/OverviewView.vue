@@ -1,51 +1,206 @@
 <script setup>
-import { computed, onMounted, ref } from "vue";
-import { Activity, ArrowUpRight, CalendarCheck, CheckCircle2, Clock3, GraduationCap, HeartHandshake, Users } from "lucide-vue-next";
-import MetricCard from "../components/MetricCard.vue";
-import StateSkeleton from "../components/StateSkeleton.vue";
-import { useAdminStore } from "../stores/admin";
-import { useTeacherStore } from "../stores/teacher";
-import { useParentStore } from "../stores/parent";
-
-const props = defineProps({ role: { type: String, default: "admin" } });
-const adminStore = useAdminStore(); const teacherStore = useTeacherStore(); const parentStore = useParentStore();
-const summary = ref(null); const profile = ref(null); const loading = ref(true); const error = ref("");
-const isParent = computed(() => props.role === "parent");
-const copy = computed(() => props.role === "admin" ? { title: "园所态势总览", desc: "一眼掌握账号、班级、学生、考勤和成长服务的实时状态。" } : props.role === "teacher" ? { title: "今日班级态势", desc: "把注意力留给孩子，系统帮你整理班级运行信号。" } : { title: "家庭陪伴总览", desc: "孩子的每一次到园、学习和探索，都值得被看见。" });
-
-const metrics = computed(() => {
-  if (props.role === "admin") return [
-    ["教师", summary.value?.teacher_count ?? 0, "已登记教学成员", Users], ["班级", summary.value?.classroom_count ?? 0, "运营中的班级", GraduationCap], ["学生", summary.value?.student_count ?? 0, "成长档案总量", HeartHandshake], ["今日出勤", summary.value?.attendance_today?.present ?? 0, `总计 ${summary.value?.attendance_today?.total ?? 0} 人`, CalendarCheck],
-  ];
-  if (props.role === "teacher") return [["本班学生", summary.value?.student_count ?? 0, "待照料的每一份成长", Users], ["今日出勤", summary.value?.attendance_today?.present ?? 0, "已完成签到", CalendarCheck], ["待处理纪律", summary.value?.discipline_count ?? 0, "保持温柔记录", Activity], ["班级状态", "LIVE", "运行正常", CheckCircle2]];
-  return [["已关联孩子", summary.value?.length ?? profile.value?.students?.length ?? 0, "正在陪伴成长", HeartHandshake], ["今日状态", "LIVE", "园所连接正常", Activity], ["陪伴提醒", "0", "暂无待处理事项", Clock3], ["成长空间", "OPEN", "随时可以探索", ArrowUpRight]];
-});
-
-function retry() {
-  if (typeof window !== "undefined") window.location.reload();
-}
-
-onMounted(async () => {
-  try {
-    if (props.role === "admin") summary.value = await adminStore.loadSummary();
-    else if (props.role === "teacher") {
-      const workspace = await teacherStore.loadWorkspace();
-      summary.value = { student_count: workspace.students.length, attendance_today: { present: workspace.attendances.filter((item) => item.status === "Present").length }, discipline_count: workspace.disciplines.length };
-    } else {
-      const family = await parentStore.loadFamily();
-      profile.value = family.profile;
-      summary.value = profile.value?.students || [];
+  import {
+    computed,
+    onMounted,
+    ref
+  } from "vue";
+  import {
+    ArrowRight,
+    CalendarCheck,
+    GraduationCap,
+    Users,
+    Sprout
+  } from "lucide-vue-next";
+  import MetricCard from "../components/MetricCard.vue";
+  import StateSkeleton from "../components/StateSkeleton.vue";
+  import {
+    useAdminStore
+  } from "../stores/admin";
+  import {
+    useTeacherStore
+  } from "../stores/teacher";
+  import {
+    useParentStore
+  } from "../stores/parent";
+  const props = defineProps({
+    role: {
+      type: String,
+      default: "admin"
     }
-  } catch (cause) { error.value = cause.message || "数据加载失败"; } finally { loading.value = false; }
-});
-</script>
+  });
+  const admin = useAdminStore(),
+    teacher = useTeacherStore(),
+    parent = useParentStore();
+  const summary = ref(null),
+    children = ref([]),
+    loading = ref(true),
+    error = ref("");
+  const isParent = computed(() => props.role === "parent");
+  const title = computed(() => isParent.value ? "陪伴，从了解今天开始" : props.role === "teacher" ? "班级概览" : "园所概览");
+  const metrics = computed(() => props.role === "admin" ? [
+    ["教师", summary.value?.teacher_count ?? 0, "已登记", Users],
+    ["班级", summary.value?.classroom_count ?? 0, "已登记", GraduationCap],
+    ["学生", summary.value?.student_count ?? 0, "成长档案", Users],
+    ["今日出勤", summary.value?.attendance_today?.present ?? 0, "已签到", CalendarCheck]
+  ] : [
+    ["本班学生", children.value.length, "已登记", Users],
+    ["今日出勤", summary.value?.present ?? 0, "已签到", CalendarCheck]
+  ]);
+  const base = computed(() => isParent.value ? "/parent_dashboard/my_kids" : "/dashboard/kids_list");
 
+  function name(child) {
+    return [child.first_name, child.second_name, child.surname].filter(Boolean).join(" ");
+  }
+  async function load() {
+    loading.value = true;
+    error.value = "";
+    try {
+      if (props.role === "admin") {
+        summary.value = await admin.loadSummary();
+      } else if (props.role === "teacher") {
+        const data = await teacher.loadWorkspace();
+        children.value = data.students;
+        const now = new Date();
+        const today = [now.getFullYear(), String(now.getMonth() + 1).padStart(2, "0"), String(now.getDate()).padStart(2, "0")].join("-");
+        summary.value = {
+          present: data.attendances.filter(a => a.status === "Present" && a.date === today).length
+        };
+      } else {
+        const data = await parent.loadFamily();
+        children.value = data.profile?.students || [];
+      }
+    } catch (cause) {
+      error.value = cause.message || "加载失败，请重试。";
+    } finally {
+      loading.value = false;
+    }
+  }
+  onMounted(load);
+</script>
 <template>
   <div>
-    <div class="page-heading"><div><span class="mono-label">{{ props.role === 'admin' ? 'CONTROL / OVERVIEW' : props.role === 'teacher' ? 'CLASSROOM / TODAY' : 'FAMILY / TODAY' }}</span><h1>{{ copy.title }}</h1><p>{{ copy.desc }}</p></div><div class="topbar-meta"><span class="live-dot">{{ props.role === 'parent' ? '连接正常' : '实时同步' }}</span></div></div>
-    <div v-if="error" class="notice error" style="margin-bottom:16px">{{ error }} <button class="row-action" type="button" @click="retry">重新加载</button></div>
-    <div v-if="loading" class="metric-grid"><StateSkeleton v-for="i in 4" :key="i" :count="1" height="148px" /></div>
-    <div v-else class="metric-grid"><MetricCard v-for="[label, value, foot, Icon] in metrics" :key="label" :label="label" :value="value" :foot="foot" :icon="Icon"><template #action><ArrowUpRight :size="14" /></template></MetricCard></div>
-    <div class="data-grid" style="margin-top:18px"><section class="surface surface-pad"><div class="surface-title"><h2>{{ isParent ? '孩子连接' : '运行信号' }}</h2><span>{{ isParent ? '已授权数据' : 'SYSTEM FEED' }}</span></div><div v-if="isParent && summary?.length" class="data-grid" style="grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px"><div v-for="child in summary" :key="child.id" style="padding:14px; border:1px solid var(--light-line); border-radius:10px; background:#fff"><span class="mono-label">CHILD / {{ child.admission_number }}</span><strong style="display:block; margin-top:7px; color:#1a4b61">{{ child.first_name }} {{ child.second_name }} {{ child.surname }}</strong><small style="display:block; margin-top:5px; color:#718898">{{ child.classroom?.name || '班级信息同步中' }}</small></div></div><div v-else class="empty-state"><CheckCircle2 :size="28" style="margin-bottom:10px; color:var(--cyan)" /><strong>所有核心服务运行正常</strong><span>数据会在新的操作完成后自动刷新。</span></div></section><section class="surface surface-pad"><div class="surface-title"><h2>{{ props.role === 'admin' ? '快捷入口' : '下一步建议' }}</h2><span>QUICK ACTION</span></div><div style="display:grid; gap:8px"><RouterLink v-if="props.role === 'admin'" v-for="item in [['学生档案','/admin_dashboard/students'],['今日考勤','/admin_dashboard/attendances'],['绑定审批','/admin_dashboard/parent_students']]" :key="item[1]" class="button button-dark" :to="item[1]" style="justify-content:space-between">{{ item[0] }}<ArrowUpRight :size="15" /></RouterLink><template v-else><div class="notice"><Clock3 :size="16" style="vertical-align:-3px; margin-right:6px" />今天也要记得给孩子一个拥抱。</div><RouterLink v-if="props.role === 'parent'" class="button button-light" to="/parent_dashboard/my_kids">查看孩子状态 <ArrowUpRight :size="15" /></RouterLink><RouterLink v-else class="button button-dark" to="/dashboard/kids_list">打开学生列表 <ArrowUpRight :size="15" /></RouterLink></template></div></section></div>
+    <div class="page-heading">
+      <div>
+        <h1>{{title}}</h1>
+        <p>{{isParent?'在家和在园的日常，都在孩子的成长记录里。':'查看已登记的信息，继续今天的工作。'}}</p>
+      </div>
+      <RouterLink class="button button-light" :to="props.role==='admin'?'/admin_dashboard/students':base">{{props.role==='admin'?'查看学生':isParent?'管理孩子':'全部学生'}}
+        <ArrowRight :size="15" />
+      </RouterLink>
+    </div>
+    <div v-if="error" class="notice error">{{error}} <button class="row-action" @click="load">重试</button></div>
+    <div v-else-if="loading" class="metric-grid">
+      <StateSkeleton v-for="i in 2" :key="i" :count="1" height="130px" />
+    </div>
+    <template v-else>
+      <div v-if="!isParent" class="metric-grid overview-metrics">
+        <MetricCard v-for="[label,value,foot,icon] in metrics" :key="label" :label="label" :value="value" :foot="foot" :icon="icon" />
+      </div>
+      <section v-if="props.role!=='admin'" class="children-section">
+        <div class="surface-title">
+          <h2>{{isParent?'我的孩子':'孩子的成长记录'}}</h2><span>{{children.length}} 位孩子</span>
+        </div>
+        <div v-if="!children.length" class="empty-state">
+          <Sprout :size="30" /><strong>{{isParent?'还没有关联的孩子':'还没有学生档案'}}</strong><span>{{isParent?'提交孩子的学号，通过审批后就可以查看和记录。':'添加学生后，可以从这里打开成长记录。'}}</span>
+          <RouterLink class="button button-light" :to="isParent?base:'/dashboard/add_kid'" style="margin-top:18px">{{isParent?'关联孩子':'添加学生'}}</RouterLink>
+        </div>
+        <div v-else class="children-list">
+          <article v-for="child in children" :key="child.id" class="child-row"><span class="avatar">{{name(child).slice(0,1)}}</span>
+            <div class="child-info">
+              <h3>{{name(child)}}</h3>
+              <p>{{child.classroom?.name||'班级未填写'}} · 学号 {{child.admission_number}}</p>
+            </div>
+            <RouterLink class="button button-primary" :to="base+'/'+child.id+'/growth'">成长记录
+              <ArrowRight :size="14" />
+            </RouterLink>
+            <RouterLink class="row-action" :to="base+'/'+child.id">档案</RouterLink>
+          </article>
+        </div>
+      </section>
+      <section v-else class="admin-shortcuts">
+        <h2>常用操作</h2>
+        <RouterLink v-for="item in [['学生档案','/admin_dashboard/students'],['考勤记录','/admin_dashboard/attendances'],['家长绑定审批','/admin_dashboard/parent_students']]" :key="item[1]" :to="item[1]"><span>{{item[0]}}</span>
+          <ArrowRight :size="17" />
+        </RouterLink>
+      </section>
+    </template>
   </div>
 </template>
+<style scoped>
+  .overview-metrics {
+    margin-bottom: 34px
+  }
+
+  .children-section {
+    margin-top: 28px
+  }
+
+  .children-list {
+    border-top: 1px solid var(--line)
+  }
+
+  .child-row {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    padding: 22px 0;
+    border-bottom: 1px solid #edf0e6
+  }
+
+  .child-info {
+    flex: 1;
+    min-width: 0
+  }
+
+  .child-info h3 {
+    font-size: 17px;
+    font-weight: 600;
+    margin: 0;
+    color: var(--ink)
+  }
+
+  .child-info p {
+    font-size: 12px;
+    color: var(--muted-dark);
+    margin: 5px 0 0
+  }
+
+  .child-row .avatar {
+    width: 43px;
+    height: 43px
+  }
+
+  .admin-shortcuts {
+    max-width: 750px;
+    margin-top: 38px
+  }
+
+  .admin-shortcuts h2 {
+    font-size: 18px;
+    font-weight: 550
+  }
+
+  .admin-shortcuts a {
+    display: flex;
+    justify-content: space-between;
+    padding: 20px 0;
+    border-bottom: 1px solid var(--line);
+    font-size: 14px;
+    color: var(--cyan)
+  }
+
+  @media(max-width:600px) {
+    .child-row {
+      flex-wrap: wrap;
+      gap: 12px
+    }
+
+    .child-info {
+      min-width: calc(100% - 65px)
+    }
+
+    .child-row .button {
+      margin-left: 55px
+    }
+  }
+</style>

@@ -104,19 +104,19 @@ const activeSection = computed(() => userSections[activeType.value]);
 }
 
 .user-type-tab:hover {
-  color: #e9faff;
-  background: rgba(77, 228, 211, .06);
+  color: var(--cyan);
+  background: #edf2e5;
 }
 
 .user-type-tab.active {
-  color: #06282d;
-  border-color: rgba(77, 228, 211, .5);
-  background: var(--cyan);
-  box-shadow: 0 8px 20px rgba(19, 184, 198, .14);
+  color: #36512e;
+  border-color: #cbd9be;
+  background: #e4edda;
+  box-shadow: none;
 }
 
 .user-type-tab:focus-visible {
-  outline: 3px solid rgba(77, 228, 211, .42);
+  outline: 3px solid #72906a;
   outline-offset: 2px;
 }
 
