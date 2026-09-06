@@ -72,11 +72,12 @@ class DeviceChatExchange
         raise Conflict, "turn_input_conflict" unless turn.content == content
         next replay(turn) if turn.status == DeviceChatTurn::COMPLETED
         raise Conflict, "turn_processing" if turn.status == DeviceChatTurn::PROCESSING
-        raise Conflict, "invalid_retry_state" unless turn.status == DeviceChatTurn::FAILED && turn.user_message.present?
-        raise Conflict, "retry_exhausted" if turn.attempt_count >= 2
         if session.device_chat_turns.where(status: DeviceChatTurn::PROCESSING).where.not(id: turn.id).exists?
           raise Conflict, "active_turn"
         end
+        raise Conflict, "invalid_retry_state" unless turn.status == DeviceChatTurn::FAILED && turn.user_message.present?
+        raise Conflict, "retry_exhausted" if turn.attempt_count >= 2
+        raise Conflict, "invalid_retry_state" if session.device_chat_turns.where("id > ?", turn.id).exists?
 
         turn.update!(status: DeviceChatTurn::PROCESSING, attempt_count: turn.attempt_count + 1)
         next Result.new(turn: turn, replayed: false)

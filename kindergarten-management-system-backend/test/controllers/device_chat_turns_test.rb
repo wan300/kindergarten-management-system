@@ -150,6 +150,28 @@ class DeviceChatTurnsTest < ActionDispatch::IntegrationTest
     assert_equal 0, fake.calls
   end
 
+  test "a failed turn cannot retry after a later turn has completed" do
+    failing = FakeDeepseek.new(error: true)
+    with_deepseek_client(failing) { post_turn }
+    assert_error :bad_gateway, "model_failure"
+
+    success = FakeDeepseek.new
+    with_deepseek_client(success) { post_turn(turn_id: "t2", content: "later") }
+    assert_response :created
+    session = ChildChatSession.find(response.parsed_body["chat_session_id"])
+    failed_turn = session.device_chat_turns.find_by!(turn_id: "t1")
+    original_attempts = failed_turn.attempt_count
+    original_message_ids = session.child_chat_messages.order(:id).pluck(:id)
+
+    retry_client = FakeDeepseek.new
+    with_deepseek_client(retry_client) { post_turn }
+
+    assert_error :conflict, "invalid_retry_state"
+    assert_equal 0, retry_client.calls
+    assert_equal original_attempts, failed_turn.reload.attempt_count
+    assert_equal original_message_ids, session.child_chat_messages.order(:id).pluck(:id)
+  end
+
   test "does not return a reply after the device is rebound during the model call" do
     fake = FakeDeepseek.new(on_chat: -> { ChildDevice.bind!(device_id: "test-device", student: @other_student) })
 

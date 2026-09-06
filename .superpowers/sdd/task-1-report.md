@@ -106,3 +106,16 @@ PATH=/opt/homebrew/opt/ruby@3.1/bin:$PATH PARALLEL_WORKERS=1 XIAOZHI_BRIDGE_TOKE
 ```
 
 Per review instruction, the full suites were not rerun for this narrowly scoped follow-up.
+
+## Failed retry ordering guard (2026-09-06)
+
+Final integration review found that an old failed turn could be retried after a later turn completed. Because chat history already contained the later assistant response, that retry could generate a response from the wrong conversational position and attach it to the old turn. The regression first observed HTTP 201 with a new assistant message (RED). A failed retry is now accepted only when it remains the session's latest durable turn. A later processing turn still takes precedence and returns `active_turn`; any other later turn returns `invalid_retry_state` without a model call, attempt increment, or message mutation. Completed replay behavior is unchanged.
+
+Focused GREEN command:
+
+```text
+PATH=/opt/homebrew/opt/ruby@3.1/bin:$PATH PARALLEL_WORKERS=1 XIAOZHI_BRIDGE_TOKEN=test-bridge-token bundle exec rails test test/controllers/device_chat_turns_test.rb
+16 runs, 128 assertions, 0 failures, 0 errors
+```
+
+Per instruction, no full-suite run was performed for this final focused guard.
