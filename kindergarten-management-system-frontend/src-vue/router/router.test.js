@@ -51,6 +51,7 @@ describe("Vue route compatibility", () => {
       "/admin_dashboard/disciplines",
       "/admin_dashboard/educational_videos",
       "/admin_dashboard/child_chat_sessions",
+      "/admin_dashboard/child_devices",
       "/admin_dashboard/child_growth",
       "/admin_dashboard/parenting_advice",
       "/dashboard/add_kid",

@@ -21,6 +21,7 @@ import StudentDetailView from "../views/StudentDetailView.vue";
 import AttendanceDetailView from "../views/AttendanceDetailView.vue";
 import AdminUsersView from "../views/AdminUsersView.vue";
 import GrowthJournalView from "../views/GrowthJournalView.vue";
+import DeviceManagementView from "../views/DeviceManagementView.vue";
 
 const adminResources = {
   teachers: { title: "教师档案", endpoint: "/admin/teachers", fields: ["first_name", "last_name", "career_name", "email", "phone_number", "gender", "password"] },
@@ -71,6 +72,7 @@ const routes = [
       { path: "educational_videos", component: EducationalVideosView, meta: { role: "admin", theme: "dark" } },
       { path: "parenting_advice", component: ParentingAdviceView, meta: { role: "admin", theme: "dark" } },
       { path: "child_chat_sessions", component: ChildChatAdminView, meta: { role: "admin", theme: "dark" } },
+      { path: "child_devices", component: DeviceManagementView, meta: { role: "admin", theme: "dark" } },
       { path: "attendances", component: AttendanceView, props: { role: "admin" }, meta: { role: "admin", theme: "dark" } },
       { path: "child_growth", component: ChildGrowthView, meta: { role: "admin", theme: "dark" } },
     ],
