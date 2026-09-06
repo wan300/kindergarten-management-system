@@ -32,6 +32,13 @@ Rails.application.routes.draw do
     resources :attendances, only: [:index, :destroy]
     resources :disciplines, only: [:index, :show, :create, :update, :destroy]
     resources :educational_videos
+    resources :child_devices, only: [:index] do
+      collection { post :bind }
+      member do
+        patch :disable
+        patch :enable
+      end
+    end
     resources :child_chat_sessions, only: [:index, :show]
     get '/parenting_advice/recipient_options', to: 'parenting_advice#recipient_options'
     resources :external_email_recipients

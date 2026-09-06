@@ -8,6 +8,9 @@ class ChildLearningTest < ActionDispatch::IntegrationTest
     ChildTtsAudio.delete_all if defined?(ChildTtsAudio)
     ChildChatMessage.delete_all if defined?(ChildChatMessage)
     ChildChatSession.delete_all if defined?(ChildChatSession)
+    DeviceChatTurn.delete_all if defined?(DeviceChatTurn)
+    ChildDevice.delete_all if defined?(ChildDevice)
+    DeviceDiscovery.delete_all if defined?(DeviceDiscovery)
     EducationalVideo.delete_all if defined?(EducationalVideo)
     ParentStudent.delete_all
     Discipline.delete_all
@@ -185,6 +188,26 @@ class ChildLearningTest < ActionDispatch::IntegrationTest
       params: { password: "777777" },
       as: :json
     assert_response :not_found
+  end
+
+  test "admin filters child chat sessions by normalized device id" do
+    first_device = ChildDevice.bind!(device_id: "Board-A", student: @student)
+    second_device = ChildDevice.bind!(device_id: "board-b", student: @older_student)
+    ChildChatSession.create!(student: @student, title: "网页记录")
+    ChildChatSession.create!(student: @student, child_device: first_device, source: "device",
+      external_session_id: "a1", device_binding_id: first_device.binding_id,
+      device_binding_epoch: first_device.binding_epoch)
+    ChildChatSession.create!(student: @older_student, child_device: second_device, source: "device",
+      external_session_id: "b1", device_binding_id: second_device.binding_id,
+      device_binding_epoch: second_device.binding_epoch)
+
+    get "/admin/child_chat_sessions", params: { device_id: " BOARD-A " }, headers: admin_headers(@admin)
+    assert_response :success
+    assert_equal ["board-a"], response.parsed_body.map { |session| session["device_id"] }
+
+    get "/admin/child_chat_sessions", params: { device_id: "unknown" }, headers: admin_headers(@admin)
+    assert_response :success
+    assert_equal [], response.parsed_body
   end
 
   test "chat endpoint returns clear error when DeepSeek fails" do

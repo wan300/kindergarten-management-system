@@ -16,11 +16,15 @@ class ChildDevice < ApplicationRecord
 
     transaction do
       device = lock.find_or_initialize_by(device_id: normalized)
-      device.student = student
-      device.enabled = true
-      device.binding_epoch = device.persisted? ? device.binding_epoch + 1 : 1
-      device.binding_id = SecureRandom.uuid
-      device.save!
+      if device.persisted? && device.student_id == student.id
+        device.update!(enabled: true) unless device.enabled?
+      else
+        device.student = student
+        device.enabled = true
+        device.binding_epoch = device.persisted? ? device.binding_epoch + 1 : 1
+        device.binding_id = SecureRandom.uuid
+        device.save!
+      end
       device
     end
   end
