@@ -39,7 +39,7 @@ class StudentsController < ApplicationController
         return if performed?
 
         student = teacher_students.find(params[:id])
-        student.destroy
+        student.destroy!
         head :no_content
     end
     

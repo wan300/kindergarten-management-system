@@ -147,7 +147,61 @@ class AdminApi::ChildDevicesControllerTest < ActionDispatch::IntegrationTest
     assert_response :forbidden
   end
 
+  test "admin and teacher cannot delete a student with an enabled or disabled device" do
+    device = ChildDevice.bind!(device_id: "retained-board", student: @student)
+    ParentStudent.create!(parent: @parent, student: @student, status: ParentStudent::APPROVED)
+    session = ChildChatSession.create!(student: @student)
+    session.child_chat_messages.create!(role: "user", content: "Keep this web history")
+
+    [true, false].each do |enabled|
+      device.update!(enabled: enabled)
+      student_delete_requests.each do |path, headers|
+        assert_no_difference ["Student.count", "ChildDevice.count", "ParentStudent.count", "ChildChatSession.count", "ChildChatMessage.count"] do
+          delete path, headers: headers
+          assert_response :conflict
+          assert_includes response.parsed_body["error"], "改绑或解绑"
+        end
+      end
+    end
+  end
+
+  test "admin and teacher preserve the former student's device history after rebind" do
+    device = ChildDevice.bind!(device_id: "history-board", student: @student)
+    session = ChildChatSession.create!(student: @student, child_device: device, source: "device")
+    message = session.child_chat_messages.create!(role: "user", content: "Keep this device history")
+    session.device_chat_turns.create!(turn_id: "history-turn", content: message.content, status: "failed", user_message: message)
+    ChildDevice.bind!(device_id: device.device_id, student: @other_student)
+
+    student_delete_requests.each do |path, headers|
+      assert_no_difference ["Student.count", "ChildDevice.count", "ChildChatSession.count", "ChildChatMessage.count", "DeviceChatTurn.count"] do
+        delete path, headers: headers
+        assert_response :conflict
+        assert_includes response.parsed_body["error"], "设备聊天历史"
+      end
+    end
+    assert_equal @other_student.id, device.reload.student_id
+  end
+
+  test "admin and teacher can still delete students with only web history" do
+    student_delete_requests.each do |path, headers|
+      Student.transaction(requires_new: true) do
+        session = ChildChatSession.create!(student: @student)
+        session.child_chat_messages.create!(role: "user", content: "Ordinary web history")
+        assert_difference "Student.count", -1 do
+          delete path, headers: headers
+          assert_response :no_content
+        end
+        refute ChildChatSession.exists?(session.id)
+        raise ActiveRecord::Rollback
+      end
+    end
+  end
+
   private
+
+  def student_delete_requests
+    [["/admin/students/#{@student.id}", admin_headers], ["/students/#{@student.id}", teacher_headers]]
+  end
 
   def admin_headers
     { "Authorization" => "Bearer #{JWT.encode({ admin_id: @admin.id }, SECRET)}" }

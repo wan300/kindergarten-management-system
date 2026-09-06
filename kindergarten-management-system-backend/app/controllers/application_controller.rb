@@ -1,5 +1,8 @@
 class ApplicationController < ActionController::API
     before_action :authorize
+    rescue_from Student::DeletionRestricted do |error|
+      render json: { error: error.message }, status: :conflict
+    end
     def encode_token(payload)
       now = Time.current.to_i
       claims = payload.merge(

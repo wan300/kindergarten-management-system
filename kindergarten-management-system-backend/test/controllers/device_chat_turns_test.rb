@@ -223,6 +223,65 @@ class DeviceChatTurnsTest < ActionDispatch::IntegrationTest
     assert_equal "completed", old_session.device_chat_turns.find_by!(turn_id: "t1").status
   end
 
+  test "device history remains readable but cannot be continued through the web" do
+    fake = FakeDeepseek.new
+    with_deepseek_client(fake) do
+      post_turn
+      session_id = response.parsed_body["chat_session_id"]
+      get "/child/chat_sessions/#{session_id}", headers: child_headers(@student)
+      assert_response :ok
+      assert_no_difference ["ChildChatMessage.count", "DeviceChatTurn.count"] do
+        post "/child/chat_sessions/#{session_id}/messages",
+          params: { content: "Later web question" }, headers: child_headers(@student), as: :json
+        assert_response :conflict
+        assert_includes response.parsed_body["error"], "新建网页会话"
+      end
+    end
+    assert_equal 1, fake.calls
+  end
+
+  test "failed retry rejects later messages even without a later device turn" do
+    with_deepseek_client(FakeDeepseek.new(error: true)) { post_turn }
+    assert_error :bad_gateway, "model_failure"
+    turn = DeviceChatTurn.find_by!(turn_id: "t1")
+    turn.child_chat_session.child_chat_messages.create!(role: "user", content: "Legacy web message")
+    fake = FakeDeepseek.new
+    assert_no_difference ["ChildChatMessage.count", "DeviceChatTurn.count"] do
+      with_deepseek_client(fake) { post_turn }
+      assert_error :conflict, "invalid_retry_state"
+    end
+    assert_equal 0, fake.calls
+    assert_equal "failed", turn.reload.status
+    assert_equal 1, turn.attempt_count
+  end
+
+  test "device sessions destroy turns before messages and retain the binding" do
+    with_deepseek_client(FakeDeepseek.new) { post_turn }
+    session = ChildChatSession.find(response.parsed_body["chat_session_id"])
+    assert_difference "DeviceChatTurn.count", -1 do
+      assert_difference "ChildChatMessage.count", -2 do
+        session.destroy!
+      end
+    end
+    refute ChildChatSession.exists?(session.id)
+    assert ChildDevice.exists?(@device.id)
+    assert Student.exists?(@student.id)
+  end
+
+  test "a failed session destruction rolls back both turns and messages" do
+    with_deepseek_client(FakeDeepseek.new) { post_turn }
+    session = ChildChatSession.find(response.parsed_body["chat_session_id"])
+    stop_destroy = -> { throw :abort }
+    ChildChatMessage.set_callback(:destroy, :before, stop_destroy)
+    begin
+      assert_no_difference ["ChildChatSession.count", "DeviceChatTurn.count", "ChildChatMessage.count"] do
+        assert_raises(ActiveRecord::RecordNotDestroyed) { session.destroy! }
+      end
+    ensure
+      ChildChatMessage.skip_callback(:destroy, :before, stop_destroy)
+    end
+  end
+
   private
 
   FakeDeepseek = Struct.new(:error, :on_chat, :calls, :received_messages) do

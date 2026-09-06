@@ -2,6 +2,10 @@ module ChildApi
   class ChatMessagesController < BaseController
     def create
       session = accessible_chat_session(params[:chat_session_id])
+      if session.source == "device"
+        render json: { error: "设备聊天记录仅供查看，请新建网页会话后发送消息。" }, status: :conflict
+        return
+      end
       content = params[:content].to_s.strip
 
       if content.blank?

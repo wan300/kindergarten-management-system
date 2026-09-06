@@ -78,6 +78,9 @@ class DeviceChatExchange
         raise Conflict, "invalid_retry_state" unless turn.status == DeviceChatTurn::FAILED && turn.user_message.present?
         raise Conflict, "retry_exhausted" if turn.attempt_count >= 2
         raise Conflict, "invalid_retry_state" if session.device_chat_turns.where("id > ?", turn.id).exists?
+        if session.child_chat_messages.where("id > ?", turn.user_message_id).exists?
+          raise Conflict, "invalid_retry_state"
+        end
 
         turn.update!(status: DeviceChatTurn::PROCESSING, attempt_count: turn.attempt_count + 1)
         next Result.new(turn: turn, replayed: false)
