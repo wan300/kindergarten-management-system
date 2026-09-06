@@ -65,3 +65,6 @@ child_dev2/*.sqlite3
 
 # Local visual design sessions
 .superpowers/
+
+# Isolated local feature workspaces
+.worktrees/
