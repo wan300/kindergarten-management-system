@@ -5,5 +5,6 @@
 # notations and behaviors.
 Rails.application.config.filter_parameters += [
   :passw, :secret, :token, :_key, :crypt, :salt, :certificate, :otp, :ssn,
-  :smtp_password, :qq_smtp_password, :audio_base64, :audio_data, :recording_base64
+  :smtp_password, :qq_smtp_password, :audio_base64, :audio_data, :recording_base64,
+  :authorization, :xiaozhi_bridge_token
 ]

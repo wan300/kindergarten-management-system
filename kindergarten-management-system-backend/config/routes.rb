@@ -53,6 +53,10 @@ Rails.application.routes.draw do
     end
   end
 
+  scope path: :device, module: :device_api, as: :device do
+    resources :turns, only: [:create]
+  end
+
   scope path: :parent, module: :parent_api, as: :parent_api do
     get '/children', to: 'children#index'
     get '/children/:student_id/chat_sessions', to: 'children#chat_sessions'

@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.0].define(version: 2026_09_01_000000) do
+ActiveRecord::Schema[7.0].define(version: 2026_09_06_000100) do
   create_table "active_storage_attachments", force: :cascade do |t|
     t.string "name", null: false
     t.string "record_type", null: false
@@ -82,9 +82,29 @@ ActiveRecord::Schema[7.0].define(version: 2026_09_01_000000) do
     t.string "title"
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.integer "child_device_id"
+    t.string "source", default: "web", null: false
+    t.string "external_session_id"
+    t.string "device_binding_id"
+    t.integer "device_binding_epoch"
+    t.index ["child_device_id", "device_binding_epoch", "external_session_id"], name: "index_child_chat_sessions_on_device_binding_and_external_id", unique: true
+    t.index ["child_device_id"], name: "index_child_chat_sessions_on_child_device_id"
     t.index ["parent_id"], name: "index_child_chat_sessions_on_parent_id"
     t.index ["student_id", "created_at"], name: "index_child_chat_sessions_on_student_id_and_created_at"
     t.index ["student_id"], name: "index_child_chat_sessions_on_student_id"
+  end
+
+  create_table "child_devices", force: :cascade do |t|
+    t.string "device_id", null: false
+    t.integer "student_id", null: false
+    t.string "binding_id", null: false
+    t.integer "binding_epoch", default: 1, null: false
+    t.boolean "enabled", default: true, null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["binding_id"], name: "index_child_devices_on_binding_id", unique: true
+    t.index ["device_id"], name: "index_child_devices_on_device_id", unique: true
+    t.index ["student_id"], name: "index_child_devices_on_student_id"
   end
 
   create_table "child_tts_audios", force: :cascade do |t|
@@ -111,6 +131,24 @@ ActiveRecord::Schema[7.0].define(version: 2026_09_01_000000) do
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
     t.index ["teacher_id"], name: "index_classrooms_on_teacher_id", unique: true, where: "teacher_id IS NOT NULL"
+  end
+
+  create_table "device_chat_turns", force: :cascade do |t|
+    t.integer "child_chat_session_id", null: false
+    t.string "turn_id", null: false
+    t.text "content", null: false
+    t.string "status", null: false
+    t.integer "attempt_count", default: 1, null: false
+    t.integer "user_message_id"
+    t.integer "assistant_message_id"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["assistant_message_id"], name: "index_device_chat_turns_on_assistant_message_id"
+    t.index ["child_chat_session_id", "status"], name: "index_device_chat_turns_on_child_chat_session_id_and_status"
+    t.index ["child_chat_session_id", "turn_id"], name: "index_device_chat_turns_on_child_chat_session_id_and_turn_id", unique: true
+    t.index ["child_chat_session_id"], name: "index_device_chat_turns_on_child_chat_session_id"
+    t.index ["child_chat_session_id"], name: "index_device_chat_turns_on_one_processing_per_session", unique: true, where: "status = 'processing'"
+    t.index ["user_message_id"], name: "index_device_chat_turns_on_user_message_id"
   end
 
   create_table "disciplines", force: :cascade do |t|
@@ -320,10 +358,15 @@ ActiveRecord::Schema[7.0].define(version: 2026_09_01_000000) do
   add_foreign_key "attendances", "classrooms"
   add_foreign_key "attendances", "students"
   add_foreign_key "child_chat_messages", "child_chat_sessions"
+  add_foreign_key "child_chat_sessions", "child_devices"
   add_foreign_key "child_chat_sessions", "parents"
   add_foreign_key "child_chat_sessions", "students"
+  add_foreign_key "child_devices", "students"
   add_foreign_key "child_tts_audios", "child_chat_messages"
   add_foreign_key "classrooms", "teachers", on_delete: :nullify
+  add_foreign_key "device_chat_turns", "child_chat_messages", column: "assistant_message_id"
+  add_foreign_key "device_chat_turns", "child_chat_messages", column: "user_message_id"
+  add_foreign_key "device_chat_turns", "child_chat_sessions"
   add_foreign_key "disciplines", "students"
   add_foreign_key "educational_videos", "admins", on_delete: :nullify
   add_foreign_key "growth_records", "students"
