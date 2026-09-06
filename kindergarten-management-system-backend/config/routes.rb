@@ -54,6 +54,7 @@ Rails.application.routes.draw do
   end
 
   scope path: :device, module: :device_api, as: :device do
+    post '/registration', to: 'registrations#create'
     resources :turns, only: [:create]
   end
 

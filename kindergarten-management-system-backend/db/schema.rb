@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.0].define(version: 2026_09_06_000100) do
+ActiveRecord::Schema[7.0].define(version: 2026_09_06_000200) do
   create_table "active_storage_attachments", force: :cascade do |t|
     t.string "name", null: false
     t.string "record_type", null: false
@@ -151,6 +151,15 @@ ActiveRecord::Schema[7.0].define(version: 2026_09_06_000100) do
     t.index ["user_message_id"], name: "index_device_chat_turns_on_user_message_id"
   end
 
+  create_table "device_discoveries", force: :cascade do |t|
+    t.string "device_id", null: false
+    t.datetime "first_seen_at", null: false
+    t.datetime "last_seen_at", null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["device_id"], name: "index_device_discoveries_on_device_id", unique: true
+  end
+
   create_table "disciplines", force: :cascade do |t|
     t.integer "student_id"
     t.string "title"
@@ -193,7 +202,7 @@ ActiveRecord::Schema[7.0].define(version: 2026_09_06_000100) do
     t.integer "student_id", null: false
     t.date "recorded_on", null: false
     t.string "author_role", null: false
-    t.bigint "author_id", null: false
+    t.integer "author_id", null: false
     t.text "note"
     t.text "analysis"
     t.string "positive_tags", default: "", null: false
