@@ -1,4 +1,5 @@
 require "test_helper"
+require "timeout"
 
 class DeviceChatTurnsTest < ActionDispatch::IntegrationTest
   TOKEN = "test-bridge-token"
@@ -117,21 +118,60 @@ class DeviceChatTurnsTest < ActionDispatch::IntegrationTest
     with_deepseek_client(fake) { post_turn }
     old_session_id = response.parsed_body["chat_session_id"]
     ChildDevice.bind!(device_id: "test-device", student: @other_student)
-    with_deepseek_client(fake) { post_turn(turn_id: "t2") }
+    with_deepseek_client(fake) { post_turn(turn_id: "t2", content: "新的问题") }
     assert_response :created
     new_session = ChildChatSession.find(response.parsed_body["chat_session_id"])
     refute_equal old_session_id, new_session.id
     assert_equal @other_student.id, new_session.student_id
+    new_call_messages = fake.received_messages.last
+    assert_match(/Lily/, new_call_messages.first[:content])
+    refute_match(/Noah/, new_call_messages.first[:content])
+    refute new_call_messages.any? { |message| message[:content] == "你好" }
+  end
+
+  test "another child cannot access a device-created session" do
+    with_deepseek_client(FakeDeepseek.new) { post_turn }
+    session_id = response.parsed_body["chat_session_id"]
+
+    get "/child/chat_sessions/#{session_id}", headers: child_headers(@other_student)
+    assert_response :not_found
+  end
+
+  test "a failed turn cannot retry while another turn is processing" do
+    session = device_session
+    user = session.child_chat_messages.create!(role: "user", content: "first")
+    session.device_chat_turns.create!(turn_id: "t1", content: "你好", status: "failed", attempt_count: 1, user_message: user)
+    session.device_chat_turns.create!(turn_id: "held", content: "second", status: "processing", attempt_count: 1)
+    fake = FakeDeepseek.new
+
+    Timeout.timeout(1) { with_deepseek_client(fake) { post_turn } }
+
+    assert_error :conflict, "active_turn"
+    assert_equal 0, fake.calls
+  end
+
+  test "does not return a reply after the device is rebound during the model call" do
+    fake = FakeDeepseek.new(on_chat: -> { ChildDevice.bind!(device_id: "test-device", student: @other_student) })
+
+    with_deepseek_client(fake) { post_turn }
+
+    assert_error :conflict, "binding_changed"
+    old_session = ChildChatSession.find_by!(student: @student, external_session_id: "s1")
+    assert_equal 2, old_session.child_chat_messages.count
+    assert_equal "completed", old_session.device_chat_turns.find_by!(turn_id: "t1").status
+    assert_empty @other_student.child_chat_sessions
   end
 
   private
 
-  FakeDeepseek = Struct.new(:error, :calls) do
-    def initialize(error: false) = super(error, 0)
+  FakeDeepseek = Struct.new(:error, :on_chat, :calls, :received_messages) do
+    def initialize(error: false, on_chat: nil) = super(error, on_chat, 0, [])
     def chat(messages:)
       self.calls += 1
+      received_messages << messages
       raise DeepseekClient::ApiError, "provider secret detail" if error
       raise "missing child context" unless messages.first[:content].match?(/Noah|Lily/)
+      on_chat&.call
       { content: "我们一起试试吧！", model: "device-model", usage: { "prompt_tokens" => 4, "completion_tokens" => 5, "total_tokens" => 9 } }
     end
   end
@@ -141,6 +181,11 @@ class DeviceChatTurnsTest < ActionDispatch::IntegrationTest
   end
 
   def auth_headers = { "Authorization" => "Bearer #{TOKEN}", "REMOTE_ADDR" => "127.0.0.1" }
+
+  def child_headers(student)
+    token = JWT.encode({ child_student_id: student.id }, ENV.fetch("JWT_SECRET"), "HS256")
+    { "Authorization" => "Bearer #{token}" }
+  end
 
   def assert_error(status, code)
     assert_response status

@@ -5,6 +5,7 @@ namespace :xiaozhi do
     student_id = ENV["STUDENT_ID"].to_s.strip
     abort "DEVICE_ID is required" if device_id.blank?
     abort "STUDENT_ID is required" if student_id.blank?
+    abort "STUDENT_ID must be a positive integer" unless student_id.match?(/\A[1-9]\d*\z/)
 
     student = Student.find_by(id: student_id)
     abort "Student not found" unless student

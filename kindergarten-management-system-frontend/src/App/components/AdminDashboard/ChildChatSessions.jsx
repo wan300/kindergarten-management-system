@@ -32,9 +32,6 @@ export default function AdminChildChatSessions() {
                 className={`block w-full rounded border px-3 py-2 text-left text-sm ${selectedSession?.id === session.id ? "border-pink-600 bg-pink-50 text-pink-700" : "text-gray-700"}`}
                 onClick={() => setSelectedSession(session)}>
                 <span className="block font-medium">{session.student_name || "未知学生"}</span>
-                <span className="block text-xs font-medium text-cyan-700">
-                  {session.source === "device" ? `小智设备${session.device_id ? ` · ${session.device_id}` : ""}` : "儿童网页"}
-                </span>
                 <span className="block text-xs text-gray-500">{session.parent_name || "未知家长"} · {session.title || "儿童陪伴对话"}</span>
               </button>
             ))}

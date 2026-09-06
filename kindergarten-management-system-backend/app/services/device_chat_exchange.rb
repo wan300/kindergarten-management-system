@@ -27,6 +27,9 @@ class DeviceChatExchange
     begin
       reply = @reply.call(session: session, content: content, user_message: reservation.turn.user_message)
       reservation.turn.update!(status: DeviceChatTurn::COMPLETED, assistant_message: reply.assistant_message)
+      unless ChildDevice.exists?(id: device.id, enabled: true, student_id: session.student_id, binding_id: session.device_binding_id, binding_epoch: session.device_binding_epoch)
+        raise Conflict, "binding_changed"
+      end
       Result.new(turn: reservation.turn.reload, replayed: false)
     rescue DeepseekClient::Error
       reservation.turn.update!(status: DeviceChatTurn::FAILED)
@@ -60,6 +63,9 @@ class DeviceChatExchange
         raise Conflict, "turn_processing" if turn.status == DeviceChatTurn::PROCESSING
         raise Conflict, "invalid_retry_state" unless turn.status == DeviceChatTurn::FAILED && turn.user_message.present?
         raise Conflict, "retry_exhausted" if turn.attempt_count >= 2
+        if session.device_chat_turns.where(status: DeviceChatTurn::PROCESSING).where.not(id: turn.id).exists?
+          raise Conflict, "active_turn"
+        end
 
         turn.update!(status: DeviceChatTurn::PROCESSING, attempt_count: turn.attempt_count + 1)
         next Result.new(turn: turn, replayed: false)
@@ -72,7 +78,7 @@ class DeviceChatExchange
       Result.new(turn: turn, replayed: false)
     end
   rescue ActiveRecord::RecordNotUnique
-    retry
+    raise Conflict, "active_turn"
   end
 
   def replay(turn)

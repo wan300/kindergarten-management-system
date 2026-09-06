@@ -57,4 +57,39 @@ All is good!
 - Full Rails tests also print expected ffmpeg diagnostics for intentionally invalid fixture MP4 bytes; the suite passes.
 - Vitest prints its existing Vite CJS deprecation warning; tests pass.
 - Concurrency is covered deterministically by a held-processing integration case plus a database partial unique index. A timing-sensitive threaded SQLite test was intentionally avoided; SQLite serializes writes and would make that test environment-dependent.
-- Both the requested legacy React admin component and the active Vue admin view show the source. The focused executable UI test covers the active Vue view used by the production build.
+- The source indicator and focused executable UI test cover the active Vue view used by the production build.
+
+## Review fixes (2026-09-06)
+
+The follow-up review established that the React tree is inactive; the source display now exists only in the production Vue view and its executable test. Additional coverage proves that rebinding uses the new child's prompt and excludes both the former child's name and prior history, and that another child cannot read a device-created session.
+
+The review also found a concrete retry race: retrying a failed turn while a different turn was processing could hit the partial unique index and loop through an unconditional `RecordNotUnique` retry. A regression reproduced this as `Timeout::Error: execution expired`; reservation now detects the competing processing turn before updating and converts any database uniqueness race into one bounded `active_turn` conflict without calling the model.
+
+Device binding is rechecked from the database after the model response and before any successful API response. If the device was disabled or rebound during the call, the old student's completed exchange remains auditable but the caller receives `409 {"error":"binding_changed"}` and no reply body. The bind task now requires `STUDENT_ID` to match a strict positive-integer format.
+
+Review RED evidence:
+
+```text
+device rebound during model call: expected 409, received 201
+failed turn with competing processing turn: Timeout::Error: execution expired
+invalid STUDENT_ID=1abc: expected strict-positive-integer error, received "Student not found"
+```
+
+Review GREEN commands:
+
+```text
+PATH=/opt/homebrew/opt/ruby@3.1/bin:$PATH PARALLEL_WORKERS=1 XIAOZHI_BRIDGE_TOKEN=test-bridge-token bundle exec rails test test/controllers/device_chat_turns_test.rb
+12 runs, 96 assertions, 0 failures, 0 errors
+
+PATH=/opt/homebrew/opt/ruby@3.1/bin:$PATH PARALLEL_WORKERS=1 XIAOZHI_BRIDGE_TOKEN=test-bridge-token bundle exec rails test test/controllers/device_chat_turns_test.rb test/tasks/xiaozhi_rake_test.rb test/controllers/child_learning_test.rb
+20 runs, 158 assertions, 0 failures, 0 errors
+
+PATH=/opt/homebrew/opt/ruby@3.1/bin:$PATH PARALLEL_WORKERS=1 XIAOZHI_BRIDGE_TOKEN=test-bridge-token bundle exec rails test
+66 runs, 435 assertions, 0 failures, 0 errors
+
+NODE_OPTIONS=--no-experimental-webstorage npm test
+8 files, 27 tests passed
+
+npm run build
+1638 modules transformed; build completed successfully
+```
