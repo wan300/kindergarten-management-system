@@ -22,14 +22,15 @@ class DeviceChatExchange
 
     session = find_or_create_session(device, session_id)
     reservation = reserve(session, turn_id, content)
-    return reservation if reservation.replayed
+    if reservation.replayed
+      raise Conflict, "binding_changed" unless binding_current?(device, session)
+      return reservation
+    end
 
     begin
       reply = @reply.call(session: session, content: content, user_message: reservation.turn.user_message)
       reservation.turn.update!(status: DeviceChatTurn::COMPLETED, assistant_message: reply.assistant_message)
-      unless ChildDevice.exists?(id: device.id, enabled: true, student_id: session.student_id, binding_id: session.device_binding_id, binding_epoch: session.device_binding_epoch)
-        raise Conflict, "binding_changed"
-      end
+      raise Conflict, "binding_changed" unless binding_current?(device, session)
       Result.new(turn: reservation.turn.reload, replayed: false)
     rescue DeepseekClient::Error
       reservation.turn.update!(status: DeviceChatTurn::FAILED)
@@ -38,6 +39,16 @@ class DeviceChatExchange
   end
 
   private
+
+  def binding_current?(device, session)
+    ChildDevice.exists?(
+      id: device.id,
+      enabled: true,
+      student_id: session.student_id,
+      binding_id: session.device_binding_id,
+      binding_epoch: session.device_binding_epoch
+    )
+  end
 
   def find_or_create_session(device, external_id)
     ChildChatSession.find_or_create_by!(

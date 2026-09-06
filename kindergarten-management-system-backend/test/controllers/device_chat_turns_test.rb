@@ -162,6 +162,45 @@ class DeviceChatTurnsTest < ActionDispatch::IntegrationTest
     assert_empty @other_student.child_chat_sessions
   end
 
+  test "does not replay a completed reply after the device is rebound" do
+    fake = FakeDeepseek.new
+    with_deepseek_client(fake) { post_turn }
+    assert_response :created
+
+    with_session_lookup_hook(-> { ChildDevice.bind!(device_id: "test-device", student: @other_student) }) do
+      with_deepseek_client(fake) { post_turn }
+    end
+
+    assert_error :conflict, "binding_changed"
+    assert_equal 1, fake.calls
+    refute response.parsed_body.key?("assistant_message")
+  end
+
+  test "does not replay a completed reply after the device is disabled" do
+    fake = FakeDeepseek.new
+    with_deepseek_client(fake) { post_turn }
+    assert_response :created
+
+    with_session_lookup_hook(-> { @device.update!(enabled: false) }) do
+      with_deepseek_client(fake) { post_turn }
+    end
+
+    assert_error :conflict, "binding_changed"
+    assert_equal 1, fake.calls
+    refute response.parsed_body.key?("assistant_message")
+  end
+
+  test "does not return a reply after the device is disabled during the model call" do
+    fake = FakeDeepseek.new(on_chat: -> { @device.update!(enabled: false) })
+
+    with_deepseek_client(fake) { post_turn }
+
+    assert_error :conflict, "binding_changed"
+    old_session = ChildChatSession.find_by!(student: @student, external_session_id: "s1")
+    assert_equal 2, old_session.child_chat_messages.count
+    assert_equal "completed", old_session.device_chat_turns.find_by!(turn_id: "t1").status
+  end
+
   private
 
   FakeDeepseek = Struct.new(:error, :on_chat, :calls, :received_messages) do
@@ -199,6 +238,21 @@ class DeviceChatTurnsTest < ActionDispatch::IntegrationTest
     yield
   ensure
     DeepseekClient.define_singleton_method(:new, original)
+  end
+
+  def with_session_lookup_hook(hook)
+    original = ChildChatSession.method(:find_or_create_by!)
+    called = false
+    ChildChatSession.define_singleton_method(:find_or_create_by!) do |*args, **kwargs, &block|
+      unless called
+        called = true
+        hook.call
+      end
+      original.call(*args, **kwargs, &block)
+    end
+    yield
+  ensure
+    ChildChatSession.define_singleton_method(:find_or_create_by!, original)
   end
 
   def device_session

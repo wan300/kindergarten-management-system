@@ -93,3 +93,16 @@ NODE_OPTIONS=--no-experimental-webstorage npm test
 npm run build
 1638 modules transformed; build completed successfully
 ```
+
+## Replay binding recheck (2026-09-06)
+
+A second review identified that completed-turn replay returned before the live binding check. Deterministic tests change the binding immediately after the initial device lookup and before the old binding's session lookup. Both rebind and disable cases initially returned HTTP 200 with the old assistant body (RED). Replay and newly generated responses now share `binding_current?`; either path returns `409 {"error":"binding_changed"}` when the enabled binding ID, epoch, student, or device no longer matches. A third regression covers disabling during the model call and confirms the old student's exchange remains auditable without returning its reply.
+
+Focused GREEN command:
+
+```text
+PATH=/opt/homebrew/opt/ruby@3.1/bin:$PATH PARALLEL_WORKERS=1 XIAOZHI_BRIDGE_TOKEN=test-bridge-token bundle exec rails test test/controllers/device_chat_turns_test.rb
+15 runs, 116 assertions, 0 failures, 0 errors
+```
+
+Per review instruction, the full suites were not rerun for this narrowly scoped follow-up.
