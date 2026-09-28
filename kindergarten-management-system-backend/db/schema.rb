@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.0].define(version: 2026_09_06_000200) do
+ActiveRecord::Schema[7.0].define(version: 2026_09_29_000000) do
   create_table "active_storage_attachments", force: :cascade do |t|
     t.string "name", null: false
     t.string "record_type", null: false
@@ -202,13 +202,18 @@ ActiveRecord::Schema[7.0].define(version: 2026_09_06_000200) do
     t.integer "student_id", null: false
     t.date "recorded_on", null: false
     t.string "author_role", null: false
-    t.integer "author_id", null: false
+    t.bigint "author_id", null: false
     t.text "note"
     t.text "analysis"
     t.string "positive_tags", default: "", null: false
     t.string "watch_tags", default: "", null: false
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.string "analysis_status", default: "pending", null: false
+    t.string "analysis_model"
+    t.datetime "analysis_generated_at"
+    t.text "analysis_error"
+    t.index ["analysis_status"], name: "index_growth_records_on_analysis_status"
     t.index ["student_id", "recorded_on"], name: "index_growth_records_on_student_id_and_recorded_on"
     t.index ["student_id"], name: "index_growth_records_on_student_id"
   end

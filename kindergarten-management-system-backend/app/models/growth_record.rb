@@ -1,15 +1,10 @@
 class GrowthRecord < ApplicationRecord
-  POSITIVE_WORDS = %w[开心 愉快 高兴 主动 专注 进步 分享 合作 独立 安心 健康 活跃].freeze
-  WATCH_WORDS = %w[哭 难过 焦虑 害怕 生病 发烧 咳嗽 疼痛 不吃 失眠 拒绝 攻击 孤独].freeze
-
   belongs_to :student
   has_many_attached :media
 
   validates :recorded_on, :author_role, presence: true
-  validates :author_role, inclusion: { in: %w[parent teacher] }
+  validates :author_role, inclusion: { in: %w[parent teacher admin] }
   validate :has_observation
-
-  before_validation :generate_analysis
 
   def self.summary_for(records)
     recent = records.where("recorded_on >= ?", 14.days.ago.to_date).to_a
@@ -33,22 +28,7 @@ class GrowthRecord < ApplicationRecord
     }
   end
 
-  private
-
   def has_observation
     errors.add(:base, "请填写文字说明或至少上传一份照片/视频") if note.to_s.strip.blank? && media.empty?
-  end
-
-  def generate_analysis
-    normalized_note = note.to_s.downcase
-    self.positive_tags = POSITIVE_WORDS.select { |word| normalized_note.include?(word) }.join(",")
-    self.watch_tags = WATCH_WORDS.select { |word| normalized_note.include?(word) }.join(",")
-    self.analysis = if watch_tags.present?
-                      "记录中出现“#{watch_tags.tr(',', '、')}”等需要留意的描述，建议结合后续观察与家园沟通持续跟进。"
-                    elsif positive_tags.present?
-                      "记录显示孩子有“#{positive_tags.tr(',', '、')}”等积极表现，可在后续活动中继续给予回应与支持。"
-                    else
-                      "已记录本次观察。建议持续补充孩子的情绪、互动、作息或兴趣变化，便于形成更清晰的成长趋势。"
-                    end
   end
 end

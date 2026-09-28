@@ -19,8 +19,10 @@ class GrowthRecordsController < ApplicationController
     return if performed?
 
     record = @student.growth_records.build(growth_record_params.merge(author_role: author_role, author_id: author.id))
+    prepare_for_analysis(record)
     record.media.attach(media_files) if media_files.any?
     record.save!
+    analyze_record(record)
     render json: record_payload(record), status: :created
   end
 
@@ -80,6 +82,9 @@ class GrowthRecordsController < ApplicationController
       analysis: record.analysis,
       positive_tags: record.positive_tags.to_s.split(",").reject(&:blank?),
       watch_tags: record.watch_tags.to_s.split(",").reject(&:blank?),
+      analysis_status: record.analysis_status,
+      analysis_model: record.analysis_model,
+      analysis_generated_at: record.analysis_generated_at,
       created_at: record.created_at,
       media: record.media.map do |file|
         { id: file.id, filename: file.filename.to_s, content_type: file.content_type, byte_size: file.byte_size, url: rails_blob_path(file, only_path: true) }
@@ -89,6 +94,33 @@ class GrowthRecordsController < ApplicationController
 
   def invalid_response(invalid)
     render json: { errors: invalid.record.errors.full_messages }, status: :unprocessable_entity
+  end
+
+  def prepare_for_analysis(record)
+    record.analysis_status = "pending"
+    record.analysis_error = nil
+    record.analysis_model = nil
+    record.analysis_generated_at = nil
+    record.analysis = nil
+    record.positive_tags = ""
+    record.watch_tags = ""
+  end
+
+  def analyze_record(record)
+    result = GrowthRecordAnalysis.new(record).call
+    record.update_columns(
+      analysis: result.fetch(:analysis),
+      positive_tags: result.fetch(:positive_tags).join(","),
+      watch_tags: result.fetch(:watch_tags).join(","),
+      analysis_status: "completed",
+      analysis_model: result[:model],
+      analysis_generated_at: Time.current,
+      analysis_error: nil,
+      updated_at: Time.current
+    )
+  rescue GrowthRecordAnalysis::Error, DeepseekClient::Error => error
+    Rails.logger.warn("[GrowthRecordAnalysis] record=#{record.id} failed: #{error.class}: #{error.message}")
+    record.update_columns(analysis_status: "failed", analysis_error: error.message.to_s.truncate(500), updated_at: Time.current)
   end
 
   def not_found_response

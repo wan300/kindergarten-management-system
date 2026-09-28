@@ -11,12 +11,14 @@ class DeepseekClient
     api_key: ENV["DEEPSEEK_API_KEY"].presence || ENV["LLM_API_KEY"],
     base_url: ENV["DEEPSEEK_BASE_URL"].presence || ENV.fetch("LLM_BASE_URL", "https://api.deepseek.com"),
     model: ENV["DEEPSEEK_MODEL"].presence || ENV.fetch("CHAT_MODEL", "deepseek-v4-flash"),
-    max_tokens: ENV.fetch("DEEPSEEK_MAX_TOKENS", "500").to_i
+    max_tokens: ENV.fetch("DEEPSEEK_MAX_TOKENS", "500").to_i,
+    thinking: { type: "disabled" }
   )
     @api_key = api_key
     @base_url = base_url
     @model = model
     @max_tokens = max_tokens
+    @thinking = thinking
   end
 
   def chat(messages:)
@@ -55,12 +57,15 @@ class DeepseekClient
       messages: messages,
       stream: false,
       max_tokens: @max_tokens,
-      thinking: { type: "disabled" }
+      thinking: @thinking
     )
 
-    Net::HTTP.start(uri.hostname, uri.port, use_ssl: uri.scheme == "https", open_timeout: 10, read_timeout: 60) do |http|
-      http.request(request)
-    end
+    http = Net::HTTP.new(uri.hostname, uri.port)
+    http.proxy_from_env = false
+    http.use_ssl = uri.scheme == "https"
+    http.open_timeout = 10
+    http.read_timeout = 60
+    http.start { http.request(request) }
   end
 
 end

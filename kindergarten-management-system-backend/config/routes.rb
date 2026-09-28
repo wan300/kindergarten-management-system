@@ -31,6 +31,7 @@ Rails.application.routes.draw do
     resources :parent_students, only: [:index, :create, :update, :destroy]
     resources :attendances, only: [:index, :destroy]
     resources :disciplines, only: [:index, :show, :create, :update, :destroy]
+    resources :growth_records, only: [:index, :create, :update, :destroy]
     resources :educational_videos
     resources :child_devices, only: [:index] do
       collection { post :bind }

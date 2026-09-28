@@ -119,7 +119,7 @@
       </section>
       <section v-else class="admin-shortcuts">
         <h2>常用操作</h2>
-        <RouterLink v-for="item in [['学生档案','/admin_dashboard/students'],['考勤记录','/admin_dashboard/attendances'],['家长绑定审批','/admin_dashboard/parent_students']]" :key="item[1]" :to="item[1]"><span>{{item[0]}}</span>
+        <RouterLink v-for="item in [['学生档案','/admin_dashboard/students'],['成长记录','/admin_dashboard/growth_records'],['考勤记录','/admin_dashboard/attendances'],['家长绑定审批','/admin_dashboard/parent_students']]" :key="item[1]" :to="item[1]"><span>{{item[0]}}</span>
           <ArrowRight :size="17" />
         </RouterLink>
       </section>

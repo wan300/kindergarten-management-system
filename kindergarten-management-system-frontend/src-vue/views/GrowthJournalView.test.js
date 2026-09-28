@@ -39,7 +39,7 @@ describe("growth journal workflow", () => {
     await wrapper.findAll(".summary-tags button")[1].trigger("click");
     expect(wrapper.findAll(".record-item")).toHaveLength(1);
     expect(wrapper.get(".record-note").text()).toBe("独立收拾绘本");
-    expect(wrapper.text()).toContain("当前不参与自动分析");
+    expect(wrapper.text()).toContain("无法确认的内容会单独说明");
     expect(wrapper.text()).not.toContain("状态良好");
   });
   it("uploads the selected file and date with the parent/teacher identity", async () => {
