@@ -154,6 +154,37 @@ class GrowthRecordsTest < ActionDispatch::IntegrationTest
     assert_equal "2026-09-03", JSON.parse(response.body).fetch("records").first.fetch("recorded_on")
   end
 
+  test "parent can update their own record but cannot update another author's record" do
+    post "/growth_records",
+      headers: parent_headers(@parent),
+      params: { student_id: @student.id, recorded_on: "2026-09-04", note: "今天很开心。" },
+      as: :json
+    assert_response :created
+    parent_record_id = JSON.parse(response.body).fetch("id")
+
+    patch "/growth_records/#{parent_record_id}",
+      headers: parent_headers(@parent),
+      params: { recorded_on: "2026-09-05", note: "今天主动分享玩具。" },
+      as: :json
+    assert_response :success
+    updated = JSON.parse(response.body)
+    assert_equal "2026-09-05", updated.fetch("recorded_on")
+    assert_includes updated.fetch("positive_tags"), "主动"
+
+    post "/growth_records",
+      headers: teacher_headers(@teacher),
+      params: { student_id: @student.id, recorded_on: "2026-09-06", note: "教师观察：很专注。" },
+      as: :json
+    assert_response :created
+    teacher_record_id = JSON.parse(response.body).fetch("id")
+
+    patch "/growth_records/#{teacher_record_id}",
+      headers: parent_headers(@parent),
+      params: { note: "不应修改其他身份的记录。" },
+      as: :json
+    assert_response :not_found
+  end
+
   private
 
   def teacher_headers(teacher)

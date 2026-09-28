@@ -12,7 +12,7 @@ Rails.application.routes.draw do
   post '/admin_login', to: 'admin_auth#create'
   get '/profile', to: 'teachers#profile'
   get 'teacher/parent/', to: 'teachers#classroom_parents'
-  resources :growth_records, only: [:index, :create]
+  resources :growth_records, only: [:index, :create, :update]
 
   scope path: :admin, module: :admin_api, as: :admin do
     get '/profile', to: 'admins#profile'

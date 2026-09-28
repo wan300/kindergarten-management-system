@@ -4,7 +4,8 @@ class GrowthRecordsController < ApplicationController
   ALLOWED_MEDIA_TYPES = /\A(image|video)\//.freeze
 
   before_action :require_parent_or_teacher
-  before_action :load_student
+  before_action :load_student, only: [:index, :create]
+  before_action :load_record_for_update, only: [:update]
 
   rescue_from ActiveRecord::RecordInvalid, with: :invalid_response
   rescue_from ActiveRecord::RecordNotFound, with: :not_found_response
@@ -26,6 +27,19 @@ class GrowthRecordsController < ApplicationController
     render json: record_payload(record), status: :created
   end
 
+  def update
+    validate_media!
+    return if performed?
+
+    should_analyze = params.key?(:note) || media_files.any?
+    @record.assign_attributes(growth_record_params)
+    prepare_for_analysis(@record) if should_analyze
+    @record.media.attach(media_files) if media_files.any?
+    @record.save!
+    analyze_record(@record) if should_analyze
+    render json: record_payload(@record)
+  end
+
   private
 
   def require_parent_or_teacher
@@ -40,6 +54,19 @@ class GrowthRecordsController < ApplicationController
                else
                  teacher_students.find(params[:student_id])
                end
+  end
+
+  def load_record_for_update
+    record = GrowthRecord.find(params[:id])
+    accessible = if current_parent
+                   current_parent.approved_students.exists?(id: record.student_id)
+                 else
+                   teacher_students.exists?(id: record.student_id)
+                 end
+    editable = record.author_role == author_role && record.author_id.to_i == author.id
+    raise ActiveRecord::RecordNotFound unless accessible && editable
+
+    @record = record
   end
 
   def author

@@ -317,7 +317,7 @@
               <CalendarDays :size="15" />{{formatDate(group.date)}}
             </h2>
             <article v-for="record in group.items" :key="record.id" class="record-item">
-              <div class="record-author"><span class="avatar">{{record.author_role==='parent'?'家':record.author_role==='admin'?'管':'师'}}</span><strong>{{record.author_role==='parent'?'家长记录':record.author_role==='admin'?'管理员记录':'教师记录'}}</strong><time>{{time(record.created_at)}} 发布</time><button v-if="role==='admin'" class="row-action" type="button" @click="openForm(record)"><Pencil :size="13" />编辑</button></div>
+              <div class="record-author"><span class="avatar">{{record.author_role==='parent'?'家':record.author_role==='admin'?'管':'师'}}</span><strong>{{record.author_role==='parent'?'家长记录':record.author_role==='admin'?'管理员记录':'教师记录'}}</strong><time>{{time(record.created_at)}} 发布</time><button v-if="role==='admin'||record.author_role===role" class="row-action" type="button" @click="openForm(record)"><Pencil :size="13" />编辑</button></div>
               <p v-if="record.note" class="record-note">{{record.note}}</p>
               <div v-if="record.media?.length" class="record-media" :class="{single:record.media.length===1}">
                 <figure v-for="file in record.media" :key="file.id"><video v-if="file.content_type?.startsWith('video/')" controls playsinline preload="metadata" :src="mediaUrl(file.url)" /><a v-else :href="mediaUrl(file.url)" target="_blank" rel="noopener noreferrer" :aria-label="'查看原图：'+file.filename"><img :src="mediaUrl(file.url)" :alt="file.filename" loading="lazy" /></a>

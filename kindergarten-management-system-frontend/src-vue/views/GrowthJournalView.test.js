@@ -1,8 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { flushPromises, mount } from "@vue/test-utils";
 import { reactive } from "vue";
-const { get, post } = vi.hoisted(() => ({ get: vi.fn(), post: vi.fn() }));
-vi.mock("../api/client", () => ({ api: { get, form: post }, mediaUrl: p => p }));
+const { get, form } = vi.hoisted(() => ({ get: vi.fn(), form: vi.fn() }));
+vi.mock("../api/client", () => ({ api: { get, form }, mediaUrl: p => p }));
 const route = reactive({ params: { id: "1" } });
 vi.mock("vue-router", () => ({ useRoute: () => route }));
 import GrowthJournalView from "./GrowthJournalView.vue";
@@ -14,7 +14,7 @@ let wrapper;
 beforeEach(() => {
   route.params.id = "1";
   get.mockReset().mockImplementation(path => Promise.resolve(path.startsWith("/growth_records") ? { records, summary: { period: "近14天", record_count: 2, positive_tags: ["主动", "独立"] } } : path === "/students" ? [{ id: 1, first_name: "小满" }] : { id: Number(path.split("/").at(-1)), first_name: "小满" }));
-  post.mockReset();
+  form.mockReset();
   HTMLDialogElement.prototype.showModal = function () { this.setAttribute("open", ""); };
   HTMLDialogElement.prototype.close = function () { this.removeAttribute("open"); };
   URL.createObjectURL = vi.fn(() => "blob:test");
@@ -50,11 +50,12 @@ describe("growth journal workflow", () => {
     Object.defineProperty(wrapper.get('[type="file"]').element, "files", { value: [file], configurable: true });
     await wrapper.get('[type="file"]').trigger("change");
     expect(wrapper.findAll(".selected-files li")).toHaveLength(1);
-    post.mockResolvedValue({ ...records[0], id: 3 });
+    form.mockResolvedValue({ ...records[0], id: 3 });
     await wrapper.get("dialog form").trigger("submit"); await flushPromises();
-    expect(post).toHaveBeenCalledTimes(1);
-    const [url, payload, role] = post.mock.calls[0];
+    expect(form).toHaveBeenCalledTimes(1);
+    const [url, payload, role, method] = form.mock.calls[0];
     expect(url).toBe("/growth_records?student_id=1"); expect(role).toBe("teacher");
+    expect(method).toBe("POST");
     expect(payload.get("note")).toBe("今天搭积木");
     expect(payload.get("recorded_on")).toBe("2026-09-03");
     expect(payload.getAll("media[]")[0].name).toBe("blocks.png");
@@ -63,7 +64,7 @@ describe("growth journal workflow", () => {
   });
   it("rejects empty submissions and oversized media before upload", async () => {
     await setup(); await wrapper.get("dialog form").trigger("submit");
-    expect(post).not.toHaveBeenCalled();
+    expect(form).not.toHaveBeenCalled();
     const file = new File(["x"], "large.mp4", { type: "video/mp4" });
     Object.defineProperty(file, "size", { value: 101 * 1024 * 1024 });
     Object.defineProperty(wrapper.get('[type="file"]').element, "files", { value: [file], configurable: true });
@@ -73,10 +74,23 @@ describe("growth journal workflow", () => {
   });
   it("retains the note on failed save and shows a retryable error", async () => {
     await setup(); await wrapper.get("#growth-note").setValue("待保存观察");
-    post.mockRejectedValue(new Error("网络暂时不可用"));
+    form.mockRejectedValue(new Error("网络暂时不可用"));
     await wrapper.get("dialog form").trigger("submit"); await flushPromises();
     expect(wrapper.get("#growth-note").element.value).toBe("待保存观察");
     expect(wrapper.text()).toContain("网络暂时不可用");
+  });
+  it("edits a record authored by the current role with PATCH", async () => {
+    await setup();
+    await wrapper.findAll(".row-action")[0].trigger("click");
+    await wrapper.get("#growth-note").setValue("今天主动分享玩具");
+    form.mockResolvedValue({ ...records[0], note: "今天主动分享玩具" });
+    await wrapper.get("dialog form").trigger("submit"); await flushPromises();
+    const [url, payload, role, method] = form.mock.calls[0];
+    expect(url).toBe("/growth_records/1");
+    expect(role).toBe("teacher");
+    expect(method).toBe("PATCH");
+    expect(payload.get("note")).toBe("今天主动分享玩具");
+    expect(wrapper.text()).toContain("成长记录已更新");
   });
   it("ignores an obsolete child response after route changes", async () => {
     let finishOld;
