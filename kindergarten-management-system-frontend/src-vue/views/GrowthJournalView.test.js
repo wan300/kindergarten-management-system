@@ -3,7 +3,7 @@ import { flushPromises, mount } from "@vue/test-utils";
 import { reactive } from "vue";
 const { get, form } = vi.hoisted(() => ({ get: vi.fn(), form: vi.fn() }));
 vi.mock("../api/client", () => ({ api: { get, form }, mediaUrl: p => p }));
-const route = reactive({ params: { id: "1" } });
+const route = reactive({ path: "/dashboard/kids_list/1/growth", params: { id: "1" } });
 vi.mock("vue-router", () => ({ useRoute: () => route }));
 import GrowthJournalView from "./GrowthJournalView.vue";
 const records = [
@@ -13,6 +13,7 @@ const records = [
 let wrapper;
 beforeEach(() => {
   route.params.id = "1";
+  route.path = "/dashboard/kids_list/1/growth";
   get.mockReset().mockImplementation(path => Promise.resolve(path.startsWith("/growth_records") ? { records, summary: { period: "近14天", record_count: 2, positive_tags: ["主动", "独立"] } } : path === "/students" ? [{ id: 1, first_name: "小满" }] : { id: Number(path.split("/").at(-1)), first_name: "小满" }));
   form.mockReset();
   HTMLDialogElement.prototype.showModal = function () { this.setAttribute("open", ""); };
@@ -91,6 +92,25 @@ describe("growth journal workflow", () => {
     expect(method).toBe("PATCH");
     expect(payload.get("note")).toBe("今天主动分享玩具");
     expect(wrapper.text()).toContain("成长记录已更新");
+  });
+  it("uses the current parent's approved child when a stale route id is present", async () => {
+    route.params.id = "999";
+    route.path = "/parent_dashboard/my_kids/999/growth";
+    get.mockImplementation(path => {
+      if (path === "/parent/children") return Promise.resolve([{ id: 2, first_name: "Olivia", second_name: "Mei", surname: "Zhang" }]);
+      if (path === "/growth_records?student_id=2") return Promise.resolve({ records: [], summary: null });
+      if (path === "/students/2") return Promise.resolve({ id: 2, first_name: "Olivia", second_name: "Mei", surname: "Zhang" });
+      return Promise.resolve({ records: [], summary: null });
+    });
+    wrapper = mount(GrowthJournalView, { props: { role: "parent" }, global: { stubs: { RouterLink: { template: '<a><slot /></a>' } } } });
+    await flushPromises();
+    expect(get).toHaveBeenCalledWith("/parent/children", "parent");
+    expect(wrapper.text()).toContain("Olivia Mei Zhang的成长记录");
+    await wrapper.get("#growth-note").setValue("今天主动分享玩具");
+    form.mockResolvedValue({ id: 4, student_id: 2, recorded_on: "2026-09-29", note: "今天主动分享玩具", media: [] });
+    await wrapper.get("dialog form").trigger("submit"); await flushPromises();
+    expect(form.mock.calls[0][0]).toBe("/growth_records?student_id=2");
+    expect(form.mock.calls[0][2]).toBe("parent");
   });
   it("ignores an obsolete child response after route changes", async () => {
     let finishOld;

@@ -37,7 +37,12 @@
     summary = ref(null),
     student = ref(null),
     children = ref([]);
-  const studentId = computed(() => String(route.params.id || children.value[0]?.id || ""));
+  const studentId = computed(() => {
+    const requested = String(route.params.id || "");
+    if (props.role !== "parent") return requested || String(children.value[0]?.id || "");
+    const approved = children.value.find(child => String(child.id) === requested);
+    return String(approved?.id || children.value[0]?.id || "");
+  });
   const base = computed(() => {
     if (props.role === "admin") return "/admin_dashboard/growth_records";
     if (props.role === "parent" && route.path.startsWith("/parent_dashboard/growth_records")) return "/parent_dashboard/growth_records";
@@ -142,8 +147,8 @@
   async function loadChildren() {
     listError.value = "";
     try {
-      const payload = props.role === "teacher" || props.role === "admin" ? await api.get(props.role === "admin" ? "/admin/students" : "/students", props.role) : await api.get("/parents/" + localStorage.getItem("parent"), props.role);
-      children.value = props.role === "teacher" || props.role === "admin" ? (Array.isArray(payload) ? payload : []) : payload?.students || [];
+      const payload = props.role === "teacher" || props.role === "admin" ? await api.get(props.role === "admin" ? "/admin/students" : "/students", props.role) : await api.get("/parent/children", props.role);
+      children.value = Array.isArray(payload) ? payload : props.role === "teacher" || props.role === "admin" ? [] : payload?.students || [];
     } catch {
       listError.value = "孩子列表暂时无法加载。";
     }
