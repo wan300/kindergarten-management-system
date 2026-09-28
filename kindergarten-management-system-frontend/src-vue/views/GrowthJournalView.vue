@@ -117,6 +117,18 @@
     to.value = "";
     tag.value = "";
   }
+
+  function recordId(record) {
+    const value = record?.id ?? record?.record_id ?? record?.growth_record_id;
+    return value === null || value === undefined || value === "" ? null : String(value);
+  }
+
+  function normalizeRecord(record) {
+    if (!record || typeof record !== "object") return record;
+    const id = recordId(record);
+    return id === null || record.id !== undefined ? record : { ...record, id };
+  }
+
   let requestId = 0;
   async function load(clear = true) {
     const version = ++requestId,
@@ -135,7 +147,7 @@
     try {
       const [payload, child] = await Promise.all([api.get(recordsEndpoint.value + "?student_id=" + encodeURIComponent(id), props.role), api.get(studentEndpoint.value + encodeURIComponent(id), props.role)]);
       if (version !== requestId) return;
-      records.value = payload?.records || [];
+      records.value = (payload?.records || []).map(normalizeRecord);
       summary.value = payload?.summary || null;
       student.value = child;
     } catch (cause) {
@@ -198,8 +210,12 @@
   }
 
   function openForm(record = null) {
+    if (record && recordId(record) === null) {
+      error.value = "这条成长记录缺少唯一标识，请刷新后重试。";
+      return;
+    }
     formError.value = "";
-    editingRecord.value = record;
+    editingRecord.value = record ? normalizeRecord(record) : null;
     form.value = { recorded_on: record?.recorded_on || localDate(), note: record?.note || "" };
     dialog.value.showModal();
   }
@@ -228,10 +244,16 @@
         file
       }) => payload.append("media[]", file));
       const isEditing = Boolean(editingRecord.value);
-      const url = isEditing ? recordsEndpoint.value + "/" + editingRecord.value.id : recordsEndpoint.value + "?student_id=" + encodeURIComponent(id);
+      const editedRecordId = recordId(editingRecord.value);
+      if (isEditing && editedRecordId === null) {
+        formError.value = "这条成长记录缺少唯一标识，请刷新后重试。";
+        return;
+      }
+      const url = isEditing ? recordsEndpoint.value + "/" + editedRecordId : recordsEndpoint.value + "?student_id=" + encodeURIComponent(id);
       const saved = await api.form(url, payload, props.role, isEditing ? "PATCH" : "POST");
       if (studentId.value !== id) return;
-      records.value = isEditing ? records.value.map((record) => record.id === saved.id ? saved : record) : [saved, ...records.value];
+      const savedRecord = normalizeRecord(saved);
+      records.value = isEditing ? records.value.map((record) => recordId(record) === editedRecordId ? savedRecord : record) : [savedRecord, ...records.value];
       resetForm();
       dialog.value.close();
       clearFilters();

@@ -93,6 +93,24 @@ describe("growth journal workflow", () => {
     expect(payload.get("note")).toBe("今天主动分享玩具");
     expect(wrapper.text()).toContain("成长记录已更新");
   });
+  it("uses compatible record identifiers when editing legacy payloads", async () => {
+    const legacyRecord = { record_id: 7, recorded_on: "2026-09-05", created_at: "2026-09-05T02:00:00Z", author_role: "teacher", note: "旧格式记录", media: [] };
+    get.mockImplementation(path => Promise.resolve(path.startsWith("/growth_records") ? { records: [legacyRecord], summary: null } : path === "/students" ? [{ id: 1, first_name: "小满" }] : { id: 1, first_name: "小满" }));
+    await setup();
+    await wrapper.find(".row-action").trigger("click");
+    form.mockResolvedValue({ ...legacyRecord, record_id: 7, note: "已更新" });
+    await wrapper.get("dialog form").trigger("submit"); await flushPromises();
+    expect(form.mock.calls[0][0]).toBe("/growth_records/7");
+    expect(form.mock.calls[0][3]).toBe("PATCH");
+  });
+  it("blocks editing when a record has no stable identifier", async () => {
+    const invalidRecord = { recorded_on: "2026-09-05", created_at: "2026-09-05T02:00:00Z", author_role: "teacher", note: "无法定位", media: [] };
+    get.mockImplementation(path => Promise.resolve(path.startsWith("/growth_records") ? { records: [invalidRecord], summary: null } : path === "/students" ? [{ id: 1, first_name: "小满" }] : { id: 1, first_name: "小满" }));
+    await setup();
+    await wrapper.find(".row-action").trigger("click");
+    expect(form).not.toHaveBeenCalled();
+    expect(wrapper.text()).toContain("缺少唯一标识，请刷新后重试");
+  });
   it("uses the current parent's approved child when a stale route id is present", async () => {
     route.params.id = "999";
     route.path = "/parent_dashboard/my_kids/999/growth";
