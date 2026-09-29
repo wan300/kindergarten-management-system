@@ -73,6 +73,13 @@ describe("growth journal workflow", () => {
     expect(wrapper.text()).toContain("每个文件不能超过 100 MB");
     expect(wrapper.findAll(".selected-files li")).toHaveLength(0);
   });
+  it("opens a new form from the empty-state call to action", async () => {
+    get.mockImplementation(path => Promise.resolve(path.startsWith("/growth_records") ? { records: [], summary: null } : path === "/students" ? [{ id: 1, first_name: "小满" }] : { id: 1, first_name: "小满" }));
+    await setup();
+    await wrapper.get(".empty-state button").trigger("click");
+    expect(wrapper.get("#growth-dialog-title").text()).toBe("新增成长记录");
+    expect(wrapper.text()).not.toContain("缺少唯一标识");
+  });
   it("retains the note on failed save and shows a retryable error", async () => {
     await setup(); await wrapper.get("#growth-note").setValue("待保存观察");
     form.mockRejectedValue(new Error("网络暂时不可用"));

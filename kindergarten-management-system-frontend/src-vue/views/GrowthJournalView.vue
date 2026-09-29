@@ -335,7 +335,7 @@
       <div v-else class="journal-columns">
         <section id="journal-records" class="record-timeline" aria-label="成长记录时间线" aria-live="polite">
           <div v-if="!groups.length&&!error" class="empty-state">
-            <Sprout :size="32" /><strong>{{records.length?'当前筛选下没有记录':'还没有成长记录'}}</strong><span>{{records.length?'试试其他日期，或清除筛选。':'从今天的一次小观察开始吧。'}}</span><button v-if="!records.length" class="button button-light" style="margin-top:20px" :disabled="!student" @click="openForm">
+            <Sprout :size="32" /><strong>{{records.length?'当前筛选下没有记录':'还没有成长记录'}}</strong><span>{{records.length?'试试其他日期，或清除筛选。':'从今天的一次小观察开始吧。'}}</span><button v-if="!records.length" class="button button-light" style="margin-top:20px" :disabled="!student" @click="openForm()">
               <Plus :size="15" />记下第一个瞬间
             </button>
           </div>
